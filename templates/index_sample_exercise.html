@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title%}Index Page{% endblock%}
+
+{% block content%}
+    <h1>Welcome to Template Exercise</h1>
+    <form method='POST' action={{url_for}}>
+        <input type='text' name='username' placeholder="User Name"><br>
+        <input type='password' name='password' placeholder="password"><br>
+        <input type='submit' value="Login">
+    </form>
+
+    <ul>
+        {% for item in mylist%}
+            <li {% if item == 3 %} style="color:red" {% endif%}>{{item}}</li> 
+        {% endfor %}
+    </ul>
+    <p>{{mylist}}</p>
+
+    <a href="{{ url_for('other') }}">Other</a>
+{% endblock content%}

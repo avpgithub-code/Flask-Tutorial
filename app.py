@@ -1,84 +1,76 @@
-from flask import Flask,request,jsonify
-import sqlite3
-
-# =======================================
-app = Flask(__name__)
-# =======================================
-def db_connetion():
-    conn = None
-    try:
-        conn = sqlite3.connect('books.sqlite')
-    except sqlite3.Error as e:
-        print(e)
-    
-    return conn
-# ==========================================
-@app.route('/books',methods=['GET','POST'])
-def books():
-    conn = db_connetion()
-    cursor = conn.cursor()
-    # =================================
+from flask import Flask,request,jsonify,make_response,render_template,\
+    redirect,url_for,redirect,Response,send_from_directory
+import pandas as pd
+import os,sys,uuid
+# =============================================================================================
+app = Flask(__name__,template_folder='templates')
+# =============================================================================================
+@app.route('/',methods=['GET','POST'])
+# =============================================================================================
+def index():
+    # ---------------------------------------------------------------------------
     if request.method == 'GET':
-    # =================================
-        cursor = conn.execute("SELECT * FROM book")
-        books = [
-            dict(id=row[0],author=row[1],language=row[2],title=row[3])
-            for row in cursor.fetchall()
-        ]
-        if books is not None:
-            return jsonify(books)
-    # =================================
-    if request.method == 'POST':
-    # =================================
-        new_author=request.form['author']
-        new_lang=request.form['language']
-        new_title=request.form['title']
-        sql = """INSERT INTO book (author,language,title) VALUES (?,?,?)"""
-        cursor = conn.execute(sql,(new_author,new_lang,new_title))
-        conn.commit()
-        
-        return f"Book with ID: {cursor.lastrowid} created successfully"
-# ==========================================
-@app.route('/book/<int:id>',methods=['GET','PUT','DELETE'])
-def single_book(id):
-    conn = db_connetion()
-    cursor = conn.cursor()
-    book = None
-    # ------------------------------------------------
-    if request.method== 'GET':
-    # ------------------------------------------------
-        cursor.execute("SELECT * FROM book WHERE id=?",(id,))
-        rows = cursor.fetchall()
-        for r in rows:
-            book = r
-            if book is not None:
-                return jsonify(book),200
-            else:
-                return "Something went wrong",404
-    # -----------------------------------------------------
-    if request.method == 'PUT':
-    # -----------------------------------------------------
-        sql = """UPDATE book SET title=?,author=?,language=? WHERE id=?"""
-        author= request.form['author']
-        language= request.form['language']
-        title= request.form['title']
-        updated_book = {
-            'id':id,
-            'author':author,
-            'language':language,
-            'title':'title'
+    # ---------------------------------------------------------------------------
+        return render_template('index.html')
+    # ---------------------------------------------------------------------------
+    elif request.method == 'POST':
+        # ---------------------------------------------------------------------------
+        username = request.form['username']
+        password = request.form['password']
+        if username == 'username' and password == 'password':
+            return 'Success'
+        else:
+            return 'Failure'
+# =============================================================================================
+@app.route('/file_upload', methods=['POST'])
+# =============================================================================================
+def file_upload():
+    file = request.files['file']
+    if (file.content_type == 'text/plain') or (file.content_type == 'text/csv'):
+        return file.read().decode()
+    elif (file.content_type == 'application/vnd.ms-excel') or \
+          (file.content_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'):
+          df = pd.read_excel(file)
+          return df.to_html()
+# =============================================================================================
+@app.route('/convert_csv',methods=['POST'])
+# =============================================================================================
+def convert_csv():
+    file = request.files['file']
+    df = pd.read_excel(file)
+    response = Response(
+        df.to_csv(),
+        mimetype='text/csv',
+        headers={
+            'Content-Disposition': 'attachment; filename=result.csv'
         }
-        conn.execute(sql, (author,language,title,id))
-        conn.commit()
-        return jsonify(updated_book)
-    # -----------------------------------------------------
-    if request.method == 'DELETE':
-    # -----------------------------------------------------
-        sql = """ DELETE FROM book WHERE id=?"""
-        conn.execute(sql, (id,))
-        conn.commit()
-        return f"The book with id: {id} has been deleted.",200
+    )
+    return response
+# =============================================================================================
+@app.route('/convert_csv_two', methods=['POST'])
+def convert_csv_two():
+    file = request.files['file']
+    df = pd.read_excel(file)
+    if not os.path.exists('downloads'):
+        os.makedirs('downloads')
+    filename = f'{uuid.uuid4()}.csv'
+    df.to_csv(os.path.join('downloads',filename))
+    return render_template('download.html',filename=filename)
 
-if __name__ =='__main__':
-    app.run(debug=True)
+@app.route('/downloads/<filename>')
+def download(filename):
+    return send_from_directory('downloads',filename,download_name='result.csv')
+
+@app.route('/handle_json',methods=['POST'])
+def handle_json():
+    greeting = request.json['greeting']
+    name = request.json['name']
     
+    with open('file_txt','w') as f:
+        f.write(f'{greeting}, {name}')
+        
+    return jsonify({'message': 'Successfully written!'})
+# =============================================================================================
+if __name__ == '__main__':
+# =============================================================================================
+    app.run(host='127.0.0.1',port=5000,debug=True)
